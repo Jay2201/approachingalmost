@@ -6,8 +6,9 @@ from sklearn import metrics
 import config
 import os
 import argparse
+import model_dispatcher
 
-def run(fold):
+def run(fold, model):
     # read the training data with folds
     df = pd.read_csv(config.TRAINING_FILE)
 
@@ -26,7 +27,7 @@ def run(fold):
     y_valid = df_valid.label.values
 
     # initialize simple Decision Tree Classifier
-    clf = tree.DecisionTreeClassifier()
+    clf = model_dispatcher.models[model]
 
     # fit the model on the training data
     clf.fit(x_train, y_train)
@@ -55,8 +56,15 @@ if __name__ == "__main__":
         type=int
     )
 
+    parser.add_argument(
+        "--model",
+        type=str
+    )
     # read the argument from command line
     args = parser.parse_args()
 
     # run the folds specified by command line
-    run(fold=args.fold)
+    run(
+        fold=args.fold,
+        model=args.model
+    )
