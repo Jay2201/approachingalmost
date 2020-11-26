@@ -4,7 +4,12 @@ from sklearn import model_selection
 
 if __name__ == "__main__":
     # Training data is in a csv file called train.csv
-    df = pd.read_csv("./input/mnist_train.csv")
+    df = pd.read_csv("./input/imdb.csv")
+
+    # map positive to 1 and negative to 0
+    df.sentiment = df.sentiment.apply(
+        lambda x: 1 if x == "positive" else 0
+        )
 
     # we create a new column called kfold and fill it with -1
     df["kfold"] = -1
@@ -13,7 +18,7 @@ if __name__ == "__main__":
     df = df.sample(frac=1).reset_index(drop=True)
 
     # fetch targets
-    y = df.label.values
+    y = df.sentiment.values
 
     # initiate the kfold class from model_selection module
     kf = model_selection.StratifiedKFold(n_splits=5)
@@ -23,4 +28,4 @@ if __name__ == "__main__":
         df.loc[v_, 'kfold'] = f
 
     # save the new csv with kfold column
-    df.to_csv("./input/mnist_train_folds.csv", index=False)
+    df.to_csv("./input/imdb_folds.csv", index=False)

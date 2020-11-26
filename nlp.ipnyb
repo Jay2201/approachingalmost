@@ -1,0 +1,123 @@
+{
+ "metadata": {
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.3-final"
+  },
+  "orig_nbformat": 2,
+  "kernelspec": {
+   "name": "python3",
+   "display_name": "Python 3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2,
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "from sklearn import metrics\n",
+    "from sklearn import model_selection\n",
+    "from sklearn.feature_extraction.text import CountVectorizer\n",
+    "from sklearn import linear_model\n",
+    "from nltk.tokenize import word_tokenize"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [
+    {
+     "output_type": "stream",
+     "name": "stdout",
+     "text": [
+      "Fold: 4\nAccuracy = 0.8899\n\n"
+     ]
+    }
+   ],
+   "source": [
+    "if __name__ == \"__main__\":\n",
+    "    # read the training data\n",
+    "    df = pd.read_csv(\"./input/imdb.csv\")\n",
+    "\n",
+    "    # map positive to 1 and negative to 0\n",
+    "    df.sentiment = df.sentiment.apply(\n",
+    "        lambda x: 1 if x == \"positive\" else 0\n",
+    "    )\n",
+    "\n",
+    "    # we create a new column called kfold and fill it with -1\n",
+    "    df[\"kfold\"] = -1\n",
+    "\n",
+    "    # the next step is to randomize the rows of the data\n",
+    "    df = df.sample(frac=1).reset_index(drop=True)\n",
+    "\n",
+    "    # fetch labels\n",
+    "    y = df.sentiment.values\n",
+    "\n",
+    "    # initiate the kfold class from model_selection module\n",
+    "    kf = model_selection.StratifiedKFold(n_splits=5)\n",
+    "\n",
+    "    # fill the new kfold column\n",
+    "    for f, (t_, v_) in enumerate(kf.split(X=df, y=y)):\n",
+    "        df.loc[v_, 'kfold'] = f\n",
+    "    \n",
+    "    # we go over the folds created\n",
+    "    for fold_ in range(5):\n",
+    "        # temporary dataframes for train and test\n",
+    "        train_df = df[df.kfold != fold_].reset_index(drop=True)\n",
+    "        test_df = df[df.kfold == fold_].reset_index(drop=True)\n",
+    "    \n",
+    "    # initialize CountVectorizer with NLTK's word_tokenize\n",
+    "    # function as tokenizer\n",
+    "    count_vec = CountVectorizer(\n",
+    "        tokenizer=word_tokenize,\n",
+    "        token_pattern=None\n",
+    "    )\n",
+    "\n",
+    "    # fit count_vec on training data reviews\n",
+    "    count_vec.fit(train_df.review)\n",
+    "\n",
+    "    # transform training and validation data reviews\n",
+    "    xtrain = count_vec.transform(train_df.review)\n",
+    "    xtest = count_vec.transform(test_df.review)\n",
+    "\n",
+    "    # initialize logistic regression model\n",
+    "    model = linear_model.LogisticRegression()\n",
+    "\n",
+    "    # fit the model on training data reviews and sentiment\n",
+    "    model.fit(xtrain, train_df.sentiment)\n",
+    "\n",
+    "    # make predictions on test data\n",
+    "    # threshold for predictions is 0.5\n",
+    "    preds = model.predict(xtest)\n",
+    "\n",
+    "    # calculate accuracy\n",
+    "    accuracy = metrics.accuracy_score(test_df.sentiment, preds)\n",
+    "    print(f\"Fold: {fold_}\")\n",
+    "    print(f\"Accuracy = {accuracy}\")\n",
+    "    print(\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ]
+}
