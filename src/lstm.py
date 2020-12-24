@@ -44,5 +44,28 @@ class LSTM(nn.Module):
         # we have only one output
         # input (512) = 128 + 128 for mean and same for max pooling
         self.out = nn.Linear(512, 1)
+    
+    def forward(self, x):
+        # pass data through embedding layer
+        # the input is just the tokens
+        x = self.embedding(x)
 
+        # move embedding output to lstm
+        x, _ = self.lstm(x)
+
+        # apply mean and max pooling to lstm output
+        avg_pool = torch.mean(x, 1)
+        max_pool, _ = torch.max(x, 1)
+
+        # concatenate mean and max pooling
+        # this is why size is 512
+        # 128 for each direction = 256
+        # avg_pool = 256 and max_pool = 256
+        out = torch.cat((avg_pool, max_pool), 1)
+
+        # pass through the output layer and return the output
+        out = self.out(out)
+
+        # return linear output
+        return out
         
