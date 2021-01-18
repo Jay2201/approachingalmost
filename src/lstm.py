@@ -2,6 +2,7 @@ import torch
 from torch import embedding
 import torch.nn as nn
 
+
 class LSTM(nn.Module):
     def __init__(self, embedding_matrix):
         """
@@ -15,18 +16,12 @@ class LSTM(nn.Module):
         embed_dim = embedding_matrix.shape[1]
 
         # we define an input embedding layer
-        self.embedding = nn.Embedding(
-            num_embeddings=num_words,
-            embedding_dim=embed_dim
-        )
+        self.embedding = nn.Embedding(num_embeddings=num_words, embedding_dim=embed_dim)
 
         # embedding matrix is used as weights of
         # the embedding layer
         self.embedding.weight = nn.Parameter(
-            torch.tensor(
-                embedding_matrix,
-                dtype=torch.float32
-            )
+            torch.tensor(embedding_matrix, dtype=torch.float32)
         )
 
         # we don't want to train pretrained embeddings
@@ -44,7 +39,7 @@ class LSTM(nn.Module):
         # we have only one output
         # input (512) = 128 + 128 for mean and same for max pooling
         self.out = nn.Linear(512, 1)
-    
+
     def forward(self, x):
         # pass data through embedding layer
         # the input is just the tokens
@@ -68,4 +63,3 @@ class LSTM(nn.Module):
 
         # return linear output
         return out
-        

@@ -1,70 +1,174 @@
-import joblib
+import io
+import torch
+
+import numpy as np
 import pandas as pd
-from pandas.io import parsers
-from sklearn import tree
+
+# Will not use tensorflow for traning the model
+import tensorflow as tf
+
 from sklearn import metrics
+
 import config
-import os
-import argparse
-import model_dispatcher
+import dataset
+import engine
+import lstm
 
-def run(fold, model):
-    # read the training data with folds
-    df = pd.read_csv(config.TRAINING_FILE)
 
-    # training data is where kfold is not equal to folds provided
-    # note that we are resetting the index also
-    df_train = df[df.kfold != fold].reset_index(drop=True)
+def load_vectors(fname):
+    # taken from: https://fasttext.cc/docs/en/english-vectors.html
 
-    # validation data is where the kfolds is equal to folds provided
-    df_valid = df[df.kfold == fold].reset_index(drop=True)
+    fin = io.open(fname, "r", encoding="utf-8", newline="\n", errors="ignore")
 
-    # drop the label & convert training data to numpy array for both training & validation data
-    x_train = df_train.drop("label", axis=1).values
-    y_train = df_train.label.values
+    n, d = map(int, fin.readline().split())
+    data = {}
+    for line in fin:
+        tokens = line.rstrip().split(" ")
+        data[tokens[0]] = list(map(float, tokens[1:]))
+    return data
 
-    x_valid = df_valid.drop("label", axis=1).values
-    y_valid = df_valid.label.values
 
-    # initialize simple Decision Tree Classifier
-    clf = model_dispatcher.models[model]
+def create_embedding_matrix(word_index, embedding_dict):
+    """
+    This function creates the embedding matrix.
+    :param word_index: a dictionary with word:index_value
+    :param embedding_dict: a dictionary with word:embedding_vector
+    :return: a numpy array with embedding vectors for all known words
+    """
 
-    # fit the model on the training data
-    clf.fit(x_train, y_train)
+    # initialize matrix with zeros
+    embedding_matrix = np.zeros((len(word_index) + 1, 300))
+    # loop over all the words
+    for word, i in word_index.items():
+        # if word is found in pre-trained embeddings
+        # update the matrix. if the word is not found
+        # the vector is zeros!
+        if word in embedding_dict:
+            embedding_matrix[i] = embedding_dict[word]
+    # return embedding matrix
+    return embedding_matrix
 
-    # create predictions for validation samples
-    preds = clf.predict(x_valid)
 
-    # calculate & print the accuracy score of the model
-    accuracy = metrics.accuracy_score(y_valid, preds)
-    print(f"Fold={fold}, Accuracy={accuracy}")
+def run(df, fold):
+    """
+    Run training and validation for a given fold
+    and dataset
+    :param df: pandas dataframe with kfold column
+    :param fold: current fold, int
+    """
 
-    # save the model
-    joblib.dump(
-            clf,
-            os.path.join(config.MODEL_OUTPUT, f"dt_{fold}.bin")
+    # fetch training dataframe
+    train_df = df[df.kfold != fold].reset_index(drop=True)
+
+    # fetching validation dataframe
+
+    valid_df = df[df.kfold != fold].reset_index(drop=True)
+
+    print("Fitting tokenizer")
+    # we use tf.keras for tokenization
+    # you can use your own tokenizer and then you can
+    # get rid of tensorflow
+    tokenizer = tf.keras.preprocessing.text.Tokenizer()
+    tokenizer.fit_on_texts(df.reviews.values.tolist())
+
+    # convert training data to sequences
+    # for examples : "bad movie" gets converted to
+    # [24, 27] where 24 is the index for bad and 27 is
+    # index for movie
+    xtrain = tokenizer.texts_to_sequences(train_df.review.values)
+
+    # similarly convert validation data to
+    # sequences
+    xtest = tokenizer.texts_to_sequences(valid_df.review.values)
+
+    # zero pad the training sequences given the maximum length
+    # this padding is done on left hand side
+    # if sequence is > MAX_LEN, it is truncated on left hand side too
+    xtrain = tf.keras.preprocessing.sequence.pad_sequences(
+        xtrain, maxlen=config.MAX_LEN
     )
+
+    # zero pad the validation sequence
+    xtest = tf.keras.preprocessing.sequence.pad_sequences(xtest, maxlen=config.MAX_LEN)
+
+    # initialize dataset class for training
+    train_dataset = dataset.IMDBDataset(
+        reviews=xtrain, targets=train_df.sentiment.values
+    )
+
+    # create torch dataloader for training
+    # torch dataloader loads the data using dataset
+    # class in batches specified by batch size
+    train_data_loader = torch.utils.data.Dataloader(
+        train_dataset, batch_size=config.TRAIN_BATCH_FILE, num_workers=2
+    )
+
+    # initialize dataset class for validation
+    valid_dataset = dataset.IMDBDataset(
+        reviews=xtest, targets=valid_df.sentiment.values
+    )
+
+    # create torch dataloader for validation
+    valid_data_loader = torch.utils.data.Dataloader(
+        valid_dataset, batch_size=config.VALID_BATCH_FILE, num_workers=2
+    )
+
+    print("Loading embeddings")
+    # load embeddings as shown previously
+    embedding_dict = load_vectors("../input/crawl-300d-2M.vec")
+    embedding_matrix = create_embedding_matrix(tokenizer.word_index, embedding_dict)
+
+    # create torch device, since we use gpu, we are using cuda
+    device = torch.device("cuda")
+
+    # fetch our LSTM model
+    model = lstm.LSTM(embedding_matrix)
+
+    # send model to device
+    model.to(device)
+
+    # initialize Adam Optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+    print("Training Model")
+    # set brst accuracy to zero
+    best_accuracy = 0
+    # set early stopping counter to zero
+    early_stopping_counter = 0
+    # train and validate for all epochs
+    for epochs in range(config.EPOCHS):
+        # train one epoch
+        engine.train(train_data_loader, model, optimizer, device)
+        # validate
+        outputs, targets = engine.evaluate(valid_data_loader, model, device)
+
+        # use threshold of 0.5
+        # please note we are using linear layer and no sigmoid
+        # you should do this 0.5 threshold after sigmoid
+        outputs = np.array(outputs) >= 0.5
+
+        # calculate accuracy
+        accuracy = metrics.accuracy_score(targets, outputs)
+        print(f"FOLD: {fold}, Epoch: {epoch}, Accuracy score: {accuracy}")
+
+        # simple early stopping
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+        else:
+            early_stopping_counter += 1
+
+        if early_stopping_counter > 2:
+            break
 
 
 if __name__ == "__main__":
-    # initialize ArgumentParser class of argparse
-    parser = argparse.ArgumentParser()
 
-    # add different argument you need & their type
-    parser.add_argument(
-        "--fold",
-        type=int
-    )
+    # load data
+    df = pd.read_csv("../input/imdb_folds.csv")
 
-    parser.add_argument(
-        "--model",
-        type=str
-    )
-    # read the argument from command line
-    args = parser.parse_args()
-
-    # run the folds specified by command line
-    run(
-        fold=args.fold,
-        model=args.model
-    )
+    # train for all folds
+    run(df, fold=0)
+    run(df, fold=1)
+    run(df, fold=2)
+    run(df, fold=3)
+    run(df, fold=4)

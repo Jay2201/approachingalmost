@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 def train(data_loader, model, optimizer, device):
     """
     This is main training function that trains the model
@@ -30,10 +31,7 @@ def train(data_loader, model, optimizer, device):
         predictions = model(reviews)
 
         # calculate the loss
-        loss = nn.BCEWithLogitsLoss()(
-            predictions,
-            targets.view(-1, 1)
-        )
+        loss = nn.BCEWithLogitsLoss()(predictions, targets.view(-1, 1))
 
         # compute gradient of loss w.r.t.
         # all parameters of the model that are trainable
@@ -42,8 +40,9 @@ def train(data_loader, model, optimizer, device):
         # single optimization step
         optimizer.step()
 
+
 def evaluate(data_loader, model, device):
-    # initialize empty lists to store predictions 
+    # initialize empty lists to store predictions
     # and target's
     final_predictions = []
     final_targets = []
@@ -52,7 +51,7 @@ def evaluate(data_loader, model, device):
     model.eval()
 
     # disable gradient calculation
-    with  torch.no_grad():
+    with torch.no_grad():
         for data in data_loader:
             reviews = data["review"]
             targets = data["target"]
@@ -68,6 +67,6 @@ def evaluate(data_loader, model, device):
             targets = data["target"].cpu().numpy().tolist()
             final_predictions.extend(predictions)
             final_targets.extend(targets)
-        
+
     # return final predictions and targets
     return final_predictions, final_targets

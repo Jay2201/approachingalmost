@@ -1,5 +1,6 @@
 import torch
 
+
 class IMDBDataset:
     def __init__(self, reviews, targets):
         """
@@ -8,13 +9,13 @@ class IMDBDataset:
         """
         self.reviews = reviews
         self.target = targets
-    
+
     def __len__(self):
         """
         returns length of dataset
         """
         return len(self.reviews)
-    
+
     def __getitem__(self, item):
         """
         for given item, which is int,
@@ -26,5 +27,5 @@ class IMDBDataset:
 
         return {
             "review": torch.tensor(review, dtype=torch.long),
-            "target": torch.tensor(target, dtype=torch.float)
+            "target": torch.tensor(target, dtype=torch.float),
         }
