@@ -115,11 +115,13 @@ def run(df, fold):
 
     print("Loading embeddings")
     # load embeddings as shown previously
-    embedding_dict = load_vectors("../input/crawl-300d-2M.vec")
+    embedding_dict = load_vectors(
+        "/home/zetabyte/workspace/approachingalmost/input/crawl-300d-2M.vec"
+    )
     embedding_matrix = create_embedding_matrix(tokenizer.word_index, embedding_dict)
 
     # create torch device, since we use gpu, we are using cuda
-    device = torch.device("cuda")
+    device = torch.device("cpu")
 
     # fetch our LSTM model
     model = lstm.LSTM(embedding_matrix)
@@ -164,7 +166,7 @@ def run(df, fold):
 if __name__ == "__main__":
 
     # load data
-    df = pd.read_csv("../input/imdb_folds.csv")
+    df = pd.read_csv("/home/zetabyte/workspace/approachingalmost/input/imdb_folds.csv")
 
     # train for all folds
     run(df, fold=0)
