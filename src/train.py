@@ -69,7 +69,7 @@ def run(df, fold):
     # you can use your own tokenizer and then you can
     # get rid of tensorflow
     tokenizer = tf.keras.preprocessing.text.Tokenizer()
-    tokenizer.fit_on_texts(df.reviews.values.tolist())
+    tokenizer.fit_on_texts(df.review.values.tolist())
 
     # convert training data to sequences
     # for examples : "bad movie" gets converted to
@@ -96,11 +96,11 @@ def run(df, fold):
         reviews=xtrain, targets=train_df.sentiment.values
     )
 
-    # create torch dataloader for training
-    # torch dataloader loads the data using dataset
+    # create torch DataLoader for training
+    # torch DataLoader loads the data using dataset
     # class in batches specified by batch size
-    train_data_loader = torch.utils.data.Dataloader(
-        train_dataset, batch_size=config.TRAIN_BATCH_FILE, num_workers=2
+    train_data_loader = torch.utils.data.DataLoader(
+        train_dataset, batch_size=config.TRAIN_BATCH_SIZE, num_workers=2
     )
 
     # initialize dataset class for validation
@@ -108,9 +108,9 @@ def run(df, fold):
         reviews=xtest, targets=valid_df.sentiment.values
     )
 
-    # create torch dataloader for validation
-    valid_data_loader = torch.utils.data.Dataloader(
-        valid_dataset, batch_size=config.VALID_BATCH_FILE, num_workers=2
+    # create torch DataLoader for validation
+    valid_data_loader = torch.utils.data.DataLoader(
+        valid_dataset, batch_size=config.VALID_BATCH_SIZE, num_workers=2
     )
 
     print("Loading embeddings")
@@ -138,7 +138,7 @@ def run(df, fold):
     # set early stopping counter to zero
     early_stopping_counter = 0
     # train and validate for all epochs
-    for epochs in range(config.EPOCHS):
+    for epoch in range(config.EPOCHS):
         # train one epoch
         engine.train(train_data_loader, model, optimizer, device)
         # validate
