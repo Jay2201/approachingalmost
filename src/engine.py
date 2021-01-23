@@ -63,7 +63,7 @@ def evaluate(data_loader, model, device):
 
             # move predictions and targets to the list
             # we also need to move predictions and target to cpu
-            predictions = predictions().cpu().numpy().tolist()
+            predictions = predictions.cpu().numpy().tolist()
             targets = data["target"].cpu().numpy().tolist()
             final_predictions.extend(predictions)
             final_targets.extend(targets)
